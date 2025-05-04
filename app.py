@@ -21,7 +21,7 @@ df_filtered = df.loc[mask]
 # Plot trend lines
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.plot(df_filtered['date'], df_filtered['copper_price'], label='Copper', color='orange', linewidth=2)
-ax.plot(df_filtered['date'], df_filtered['zink_price'], label='Zinc', color='steelblue', linewidth=2)
+ax.plot(df_filtered['date'], df_filtered['zinc_price'], label='Zinc', color='steelblue', linewidth=2)
 
 ax.set_title("Monthly Copper & Zinc Prices (2015–2020)")
 ax.set_xlabel("Date")
