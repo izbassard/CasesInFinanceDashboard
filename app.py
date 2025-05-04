@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 # Set Streamlit page config
 st.set_page_config(page_title="Copper & Zinc Prices (2015–2020)", layout="centered")
@@ -18,16 +18,21 @@ df['date'] = pd.to_datetime(df['date'], format='%m/%d/%Y')
 mask = (df['date'] >= '2015-01-01') & (df['date'] <= '2020-12-31')
 df_filtered = df.loc[mask]
 
-# Plot trend lines
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.plot(df_filtered['date'], df_filtered['copper_price'], label='Copper', color='orange', linewidth=2)
-ax.plot(df_filtered['date'], df_filtered['zinc_price'], label='Zinc', color='steelblue', linewidth=2)
+# Melt the dataframe to long format for Plotly Express
+df_long = df_filtered.melt(id_vars='date', value_vars=['copper_price', 'zinc_price'],
+                           var_name='Metal', value_name='Price')
 
-ax.set_title("Monthly Copper & Zinc Prices (2015–2020)")
-ax.set_xlabel("Date")
-ax.set_ylabel("Price (USD per Metric Ton)")
-ax.legend()
-ax.grid(True)
+# Rename for nicer labels
+df_long['Metal'] = df_long['Metal'].str.replace('_price', '').str.title()
 
-# Show plot in Streamlit
-st.pyplot(fig)
+# Create interactive line plot
+fig = px.line(df_long, x='date', y='Price', color='Metal',
+              title='Monthly Copper & Zinc Prices (2015–2020)',
+              labels={'date': 'Date', 'Price': 'Price (USD per Metric Ton)', 'Metal': 'Metal'},
+              template='plotly_white')
+
+fig.update_traces(mode='lines+markers')
+fig.update_layout(hovermode="x unified")
+
+# Show interactive plot in Streamlit
+st.plotly_chart(fig, use_container_width=True)
