@@ -74,3 +74,87 @@ if page == "Market Research":
 elif page == "Net Present Value":
     st.title("Net Present Value")
     st.info("This section is under development.")
+
+import numpy as np
+
+# --- Constants ---
+copper = {
+    "initial_investment": 150_000_000,
+    "life": 12,
+    "annual_cash_flow": 20_000_000,
+    "salvage_value": 10_000_000
+}
+
+zinc = {
+    "initial_investment": 50_000_000,
+    "life": 8,
+    "annual_cash_flow": 10_000_000,
+    "salvage_value": 5_000_000
+}
+
+def calculate_npv(rate, project):
+    r = rate / 100
+    cash_flows = [project["annual_cash_flow"]] * project["life"]
+    cash_flows[-1] += project["salvage_value"]
+    npv = -project["initial_investment"] + sum(cf / (1 + r)**(i + 1) for i, cf in enumerate(cash_flows))
+    return npv / 1_000_000  # Return in millions
+
+# --- UI Layout ---
+st.title("Net Present Value")
+
+# Discount Rate slider (top-right)
+col_slider, _ = st.columns([3, 1])
+with col_slider:
+    discount_rate = st.slider("Discount Rate (%)", min_value=1.0, max_value=20.0, value=8.0, step=0.5)
+
+# Calculate current NPV values
+npv_copper = calculate_npv(discount_rate, copper)
+npv_zinc = calculate_npv(discount_rate, zinc)
+
+# --- KPI Cards Row ---
+kpi1, kpi2 = st.columns(2)
+
+with kpi1:
+    st.markdown("### NPV")
+    st.markdown(f"**Copper**  \n<big><b>{npv_copper:.1f}m</b></big>", unsafe_allow_html=True)
+    st.markdown(f"**Zinc**  \n<big><b>{npv_zinc:.1f}m</b></big>", unsafe_allow_html=True)
+
+with kpi2:
+    st.markdown("### Discount Rate")
+    st.markdown(f"<big><b>{discount_rate:.1f}%</b></big>", unsafe_allow_html=True)
+
+# --- NPV over Discount Rate chart ---
+rates = np.linspace(1, 20, 100)
+npv_copper_list = [calculate_npv(r, copper) for r in rates]
+npv_zinc_list = [calculate_npv(r, zinc) for r in rates]
+
+fig = go.Figure()
+
+# Copper line
+fig.add_trace(go.Scatter(x=rates, y=npv_copper_list, mode='lines', name='Copper NPV',
+                         line=dict(color='orange')))
+# Zinc line
+fig.add_trace(go.Scatter(x=rates, y=npv_zinc_list, mode='lines', name='Zinc NPV',
+                         line=dict(color='blue')))
+
+# Current NPV points
+fig.add_trace(go.Scatter(x=[discount_rate], y=[npv_copper], mode='markers+text',
+                         name='Copper @ current rate',
+                         text=[f"{npv_copper:.1f}m"],
+                         textposition='top center',
+                         marker=dict(color='orange', size=10)))
+
+fig.add_trace(go.Scatter(x=[discount_rate], y=[npv_zinc], mode='markers+text',
+                         name='Zinc @ current rate',
+                         text=[f"{npv_zinc:.1f}m"],
+                         textposition='top center',
+                         marker=dict(color='blue', size=10)))
+
+fig.update_layout(title="NPV vs Discount Rate",
+                  xaxis_title="Discount Rate (%)",
+                  yaxis_title="NPV (Million USD)",
+                  template="plotly_white",
+                  hovermode="x unified")
+
+st.plotly_chart(fig, use_container_width=True)
+
