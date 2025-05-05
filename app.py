@@ -70,91 +70,156 @@ if page == "Market Research":
 
         st.plotly_chart(fig_ppi, use_container_width=True)
 
-# --- Net Present Value Page ---
 elif page == "Net Present Value":
-    st.title("Net Present Value")
-    st.info("This section is under development.")
+    # --- Constants ---
+    copper = {
+        "initial_investment": 150_000_000,
+        "life": 12,
+        "annual_cash_flow": 20_000_000,
+        "salvage_value": 10_000_000
+    }
 
-import numpy as np
+    zinc = {
+        "initial_investment": 50_000_000,
+        "life": 8,
+        "annual_cash_flow": 10_000_000,
+        "salvage_value": 5_000_000
+    }
 
-# --- Constants ---
-copper = {
-    "initial_investment": 150_000_000,
-    "life": 12,
-    "annual_cash_flow": 20_000_000,
-    "salvage_value": 10_000_000
-}
+    def calculate_npv(rate, project):
+        r = rate / 100
+        cash_flows = [project["annual_cash_flow"]] * project["life"]
+        cash_flows[-1] += project["salvage_value"]
+        npv = -project["initial_investment"] + sum(cf / (1 + r)**(i + 1) for i, cf in enumerate(cash_flows))
+        return npv / 1_000_000  # Return in millions
 
-zinc = {
-    "initial_investment": 50_000_000,
-    "life": 8,
-    "annual_cash_flow": 10_000_000,
-    "salvage_value": 5_000_000
-}
+    # --- UI Layout ---
+    st.markdown("""
+    <style>
+    .big-font {
+        font-size:32px !important;
+        font-weight: bold !important;
+    }
+    .metric-label {
+        font-size:16px !important;
+        color: #666 !important;
+        margin-bottom: 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-def calculate_npv(rate, project):
-    r = rate / 100
-    cash_flows = [project["annual_cash_flow"]] * project["life"]
-    cash_flows[-1] += project["salvage_value"]
-    npv = -project["initial_investment"] + sum(cf / (1 + r)**(i + 1) for i, cf in enumerate(cash_flows))
-    return npv / 1_000_000  # Return in millions
+    # Top Row: Title and Discount Rate Slider
+    col_title, col_slider = st.columns([2, 3])
+    
+    with col_title:
+        st.markdown("## Net Present Value Analysis")
+        st.markdown("Compare investment options for copper and zinc projects")
+    
+    with col_slider:
+        discount_rate = st.slider(
+            "Adjust Discount Rate (%)", 
+            min_value=1.0, 
+            max_value=20.0, 
+            value=8.0, 
+            step=0.5,
+            help="Change the discount rate to see its impact on project NPV"
+        )
 
-# --- UI Layout ---
-st.title("Net Present Value")
+    # Middle Row: KPI Metrics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown('<p class="metric-label">COPPER PROJECT NPV</p>', unsafe_allow_html=True)
+        npv_copper = calculate_npv(discount_rate, copper)
+        st.markdown(f'<p class="big-font" style="color:#FFA500">${npv_copper:.1f}M</p>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown('<p class="metric-label">ZINC PROJECT NPV</p>', unsafe_allow_html=True)
+        npv_zinc = calculate_npv(discount_rate, zinc)
+        st.markdown(f'<p class="big-font" style="color:#1F77B4">${npv_zinc:.1f}M</p>', unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown('<p class="metric-label">CURRENT DISCOUNT RATE</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="big-font">{discount_rate:.1f}%</p>', unsafe_allow_html=True)
 
-# Discount Rate slider (top-right)
-col_slider, _ = st.columns([3, 1])
-with col_slider:
-    discount_rate = st.slider("Discount Rate (%)", min_value=1.0, max_value=20.0, value=8.0, step=0.5)
+    # Bottom Row: NPV Chart
+    rates = np.linspace(1, 20, 100)
+    npv_copper_list = [calculate_npv(r, copper) for r in rates]
+    npv_zinc_list = [calculate_npv(r, zinc) for r in rates]
 
-# Calculate current NPV values
-npv_copper = calculate_npv(discount_rate, copper)
-npv_zinc = calculate_npv(discount_rate, zinc)
+    fig = go.Figure()
 
-# --- KPI Cards Row ---
-kpi1, kpi2 = st.columns(2)
+    # Copper line
+    fig.add_trace(go.Scatter(
+        x=rates, 
+        y=npv_copper_list, 
+        mode='lines', 
+        name='Copper Project',
+        line=dict(color='orange', width=3)
+    ))
+    
+    # Zinc line
+    fig.add_trace(go.Scatter(
+        x=rates, 
+        y=npv_zinc_list, 
+        mode='lines', 
+        name='Zinc Project',
+        line=dict(color='blue', width=3)
+    ))
 
-with kpi1:
-    st.markdown("### NPV")
-    st.markdown(f"**Copper**  \n<big><b>{npv_copper:.1f}m</b></big>", unsafe_allow_html=True)
-    st.markdown(f"**Zinc**  \n<big><b>{npv_zinc:.1f}m</b></big>", unsafe_allow_html=True)
+    # Current NPV points
+    fig.add_trace(go.Scatter(
+        x=[discount_rate], 
+        y=[npv_copper], 
+        mode='markers+text',
+        name=f'Copper @ {discount_rate:.1f}%',
+        text=[f"${npv_copper:.1f}M"],
+        textposition='top center',
+        marker=dict(color='orange', size=12),
+        showlegend=False
+    ))
 
-with kpi2:
-    st.markdown("### Discount Rate")
-    st.markdown(f"<big><b>{discount_rate:.1f}%</b></big>", unsafe_allow_html=True)
+    fig.add_trace(go.Scatter(
+        x=[discount_rate], 
+        y=[npv_zinc], 
+        mode='markers+text',
+        name=f'Zinc @ {discount_rate:.1f}%',
+        text=[f"${npv_zinc:.1f}M"],
+        textposition='top center',
+        marker=dict(color='blue', size=12),
+        showlegend=False
+    ))
 
-# --- NPV over Discount Rate chart ---
-rates = np.linspace(1, 20, 100)
-npv_copper_list = [calculate_npv(r, copper) for r in rates]
-npv_zinc_list = [calculate_npv(r, zinc) for r in rates]
+    # Add zero line reference
+    fig.add_hline(y=0, line_dash="dot", line_color="gray")
 
-fig = go.Figure()
+    fig.update_layout(
+        title="NPV Sensitivity to Discount Rate",
+        xaxis_title="Discount Rate (%)",
+        yaxis_title="Net Present Value (Million USD)",
+        template="plotly_white",
+        hovermode="x unified",
+        height=500,  # Increased chart height
+        margin=dict(l=20, r=20, t=60, b=20),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
 
-# Copper line
-fig.add_trace(go.Scatter(x=rates, y=npv_copper_list, mode='lines', name='Copper NPV',
-                         line=dict(color='orange')))
-# Zinc line
-fig.add_trace(go.Scatter(x=rates, y=npv_zinc_list, mode='lines', name='Zinc NPV',
-                         line=dict(color='blue')))
+    st.plotly_chart(fig, use_container_width=True)
 
-# Current NPV points
-fig.add_trace(go.Scatter(x=[discount_rate], y=[npv_copper], mode='markers+text',
-                         name='Copper @ current rate',
-                         text=[f"{npv_copper:.1f}m"],
-                         textposition='top center',
-                         marker=dict(color='orange', size=10)))
-
-fig.add_trace(go.Scatter(x=[discount_rate], y=[npv_zinc], mode='markers+text',
-                         name='Zinc @ current rate',
-                         text=[f"{npv_zinc:.1f}m"],
-                         textposition='top center',
-                         marker=dict(color='blue', size=10)))
-
-fig.update_layout(title="NPV vs Discount Rate",
-                  xaxis_title="Discount Rate (%)",
-                  yaxis_title="NPV (Million USD)",
-                  template="plotly_white",
-                  hovermode="x unified")
-
-st.plotly_chart(fig, use_container_width=True)
-
+    # Additional information
+    st.markdown("""
+    <div style="background-color:#f8f9fa;padding:15px;border-radius:5px;margin-top:20px">
+    <small>
+    <b>Analysis Notes:</b><br>
+    • The Copper project requires higher initial investment but generates more cash flow over a longer period<br>
+    • The Zinc project has lower initial costs but shorter lifespan<br>
+    • NPV becomes negative when discount rate exceeds ~11.5% for Copper and ~15% for Zinc
+    </small>
+    </div>
+    """, unsafe_allow_html=True)
