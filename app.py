@@ -71,7 +71,6 @@ if page == "Market Research":
 
         st.plotly_chart(fig_ppi, use_container_width=True)
 
-python
 elif page == "Net Present Value":
     # --- Constants ---
     copper = {
