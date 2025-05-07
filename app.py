@@ -71,20 +71,21 @@ if page == "Market Research":
 
         st.plotly_chart(fig_ppi, use_container_width=True)
 
+python
 elif page == "Net Present Value":
     # --- Constants ---
-    zinc = {
-        "initial_investment": 150_000_000,
-        "life": 12,
-        "annual_cash_flow": 20_000_000,
-        "salvage_value": 10_000_000
+    copper = {
+        "initial_investment": 50_000_000,  # These were zinc values
+        "life": 8,                         # These were zinc values
+        "annual_cash_flow": 10_000_000,    # These were zinc values
+        "salvage_value": 5_000_000         # These were zinc values
     }
 
-   copper  = {
-        "initial_investment": 50_000_000,
-        "life": 8,
-        "annual_cash_flow": 10_000_000,
-        "salvage_value": 5_000_000
+    zinc = {
+        "initial_investment": 150_000_000,  # These were copper values
+        "life": 12,                         # These were copper values
+        "annual_cash_flow": 20_000_000,     # These were copper values
+        "salvage_value": 10_000_000         # These were copper values
     }
 
     def calculate_npv(rate, project):
