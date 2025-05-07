@@ -74,17 +74,17 @@ if page == "Market Research":
 elif page == "Net Present Value":
     # --- Constants ---
     copper = {
-        "initial_investment": 50_000_000,  # These were zinc values
-        "life": 8,                         # These were zinc values
-        "annual_cash_flow": 10_000_000,    # These were zinc values
-        "salvage_value": 5_000_000         # These were zinc values
+        "initial_investment": 50_000_000,
+        "life": 8,
+        "annual_cash_flow": 10_000_000,
+        "salvage_value": 5_000_000
     }
 
     zinc = {
-        "initial_investment": 150_000_000,  # These were copper values
-        "life": 12,                         # These were copper values
-        "annual_cash_flow": 20_000_000,     # These were copper values
-        "salvage_value": 10_000_000         # These were copper values
+        "initial_investment": 150_000_000,
+        "life": 12,
+        "annual_cash_flow": 20_000_000,
+        "salvage_value": 10_000_000
     }
 
     def calculate_npv(rate, project):
@@ -148,6 +148,14 @@ elif page == "Net Present Value":
     npv_copper_list = [calculate_npv(r, copper) for r in rates]
     npv_zinc_list = [calculate_npv(r, zinc) for r in rates]
 
+    # Find crossover point (where NPVs are equal)
+    crossover_rate = None
+    for i in range(len(rates)-1):
+        if (npv_copper_list[i] - npv_zinc_list[i]) * (npv_copper_list[i+1] - npv_zinc_list[i+1]) <= 0:
+            crossover_rate = rates[i]
+            crossover_npv = npv_copper_list[i]
+            break
+
     fig = go.Figure()
 
     # Copper line
@@ -159,13 +167,13 @@ elif page == "Net Present Value":
         line=dict(color='orange', width=3)
     ))
     
-    # Zinc line
+    # Zinc line (with #1F77B4 color as requested)
     fig.add_trace(go.Scatter(
         x=rates, 
         y=npv_zinc_list, 
         mode='lines', 
         name='Zinc Project',
-        line=dict(color='blue', width=3)
+        line=dict(color='#1F77B4', width=3)
     ))
 
     # Current NPV points
@@ -187,9 +195,28 @@ elif page == "Net Present Value":
         name=f'Zinc @ {discount_rate:.1f}%',
         text=[f"${npv_zinc:.1f}M"],
         textposition='top center',
-        marker=dict(color='blue', size=12),
+        marker=dict(color='#1F77B4', size=12),
         showlegend=False
     ))
+
+    # Add crossover line and annotation if it exists in our range
+    if crossover_rate is not None:
+        fig.add_vline(
+            x=crossover_rate, 
+            line_dash="dash", 
+            line_color="gray",
+            annotation_text=f"Crossover Rate: {crossover_rate:.1f}%",
+            annotation_position="top right"
+        )
+        fig.add_trace(go.Scatter(
+            x=[crossover_rate],
+            y=[crossover_npv],
+            mode='markers+text',
+            marker=dict(color='black', size=10),
+            text=[f"${crossover_npv:.1f}M"],
+            textposition='bottom center',
+            showlegend=False
+        ))
 
     # Add zero line reference
     fig.add_hline(y=0, line_dash="dot", line_color="gray")
@@ -200,7 +227,7 @@ elif page == "Net Present Value":
         yaxis_title="Net Present Value (Million USD)",
         template="plotly_white",
         hovermode="x unified",
-        height=500,  # Increased chart height
+        height=500,
         margin=dict(l=20, r=20, t=60, b=20),
         legend=dict(
             orientation="h",
@@ -220,7 +247,8 @@ elif page == "Net Present Value":
     <b>Analysis Notes:</b><br>
     • The Copper project requires higher initial investment but generates more cash flow over a longer period<br>
     • The Zinc project has lower initial costs but shorter lifespan<br>
-    • NPV becomes negative when discount rate exceeds ~11.5% for Copper and ~15% for Zinc
+    • NPV becomes negative when discount rate exceeds ~11.5% for Copper and ~15% for Zinc<br>
+    • The crossover rate (where both projects have equal NPV) is {:.1f}%
     </small>
     </div>
-    """, unsafe_allow_html=True)
+    """.format(crossover_rate if crossover_rate is not None else "not in range"), unsafe_allow_html=True)
