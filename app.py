@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import folium
+from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 
 # Set Streamlit page configuration
@@ -296,7 +297,7 @@ elif page == "Mining Locations":
     # Create base map centered over Kazakhstan
     m = folium.Map(location=[48.0, 67.0], zoom_start=5)
 
-    # Helper function to parse and normalize tonnage
+    # Helper function to extract tonnage
     def extract_tonnage(value):
         try:
             if pd.isna(value) or "неизвестно" in str(value):
@@ -308,14 +309,17 @@ elif page == "Mining Locations":
         except:
             return 0
 
-    # Iterate over DataFrame and add circles to the map
+    # Create a marker cluster
+    cluster = MarkerCluster().add_to(m)
+
+    # Add markers
     for _, row in df.iterrows():
         lat = row['Широта']
         lon = row['Долгота']
         metals = row['Тип металла'].lower()
         volume = extract_tonnage(row['Объем добычи/запасы (тонн)'])
 
-        # Set color and size
+        # Determine color
         if "цинк" in metals and "медь" not in metals:
             color = "#1f77b4"
         elif "медь" in metals:
@@ -323,16 +327,27 @@ elif page == "Mining Locations":
         else:
             color = "gray"
 
-        radius = max(3, (volume / 1_000_000) * 5)  # Normalize radius
+        # Calculate radius with upper/lower bounds
+        min_radius = 3
+        max_radius = 15
+        radius = min(max(min_radius, (volume / 1_000_000) * 5), max_radius)
 
+        # Create popup content
+        popup_html = f"""
+        <b>{row['Название месторождения']}</b><br>
+        <b>Металлы:</b> {metals.title()}<br>
+        <b>Объем:</b> {volume:,.0f} т
+        """
+
+        # Add circle marker to cluster
         folium.CircleMarker(
             location=[lat, lon],
             radius=radius,
-            popup=folium.Popup(f"{row['Название месторождения']}<br>{metals.title()}<br>{int(volume):,} т", max_width=250),
+            popup=folium.Popup(popup_html, max_width=300),
             color=color,
             fill=True,
             fill_opacity=0.6
-        ).add_to(m)
+        ).add_to(cluster)
 
-    # Render map in Streamlit
+    # Display the map
     st_data = st_folium(m, width=800, height=600)
