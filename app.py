@@ -7,9 +7,45 @@ import numpy as np
 # Set Streamlit page configuration
 st.set_page_config(page_title="Kazakhmys Dashboard", layout="wide")
 
+# --- Custom CSS for sidebar navigation ---
+st.markdown("""
+<style>
+    /* Sidebar navigation buttons */
+    div[role="radiogroup"] > label {
+        width: 100%;
+        padding: 0.5rem;
+        margin-bottom: 0.25rem;
+        border-radius: 0.25rem;
+        transition: all 0.3s;
+    }
+    div[role="radiogroup"] > label:hover {
+        background-color: rgba(250, 250, 250, 0.1);
+    }
+    div[role="radiogroup"] > label[data-baseweb="radio"] > div:first-child {
+        padding-left: 1rem;
+    }
+    /* Active button style */
+    div[role="radiogroup"] > label[data-baseweb="radio"] > div:first-child > div {
+        background-color: #1F77B4 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- Sidebar Navigation ---
 st.sidebar.title("Kazakhmys Dashboard")
-page = st.sidebar.radio("Select a page", ["Market Research", "Net Present Value"])
+
+# Create page selection with custom styling
+page = st.sidebar.radio(
+    "Select a page",
+    ["Market Research", "Net Present Value"],
+    label_visibility="collapsed"
+)
+
+# Update URL based on selection (simulated since Streamlit doesn't support direct URL manipulation)
+if page == "Market Research":
+    st.sidebar.markdown("**Current Page:** `/market-research`")
+elif page == "Net Present Value":
+    st.sidebar.markdown("**Current Page:** `/npv-analysis`")
 
 # --- Load Data ---
 # Load copper & zinc prices
@@ -121,7 +157,7 @@ elif page == "Net Present Value":
             "Adjust Discount Rate (%)", 
             min_value=1.0, 
             max_value=20.0, 
-            value=8.0, 
+            value=15.5,  # Changed default to 15.5%
             step=0.5,
             help="Change the discount rate to see its impact on project NPV"
         )
