@@ -73,14 +73,14 @@ if page == "Market Research":
 
 elif page == "Net Present Value":
     # --- Constants ---
-    copper = {
+    zinc = {
         "initial_investment": 150_000_000,
         "life": 12,
         "annual_cash_flow": 20_000_000,
         "salvage_value": 10_000_000
     }
 
-    zinc = {
+   copper  = {
         "initial_investment": 50_000_000,
         "life": 8,
         "annual_cash_flow": 10_000_000,
