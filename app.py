@@ -39,7 +39,7 @@ st.sidebar.title("Kazakhmys Dashboard")
 # Create page selection with custom styling
 page = st.sidebar.radio(
     "Select a page",
-    ["Market Research", "Net Present Value"],
+    ["Market Research", "Net Present Value", "Mining Locations"],
     label_visibility="collapsed"
 )
 
