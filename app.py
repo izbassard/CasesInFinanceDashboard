@@ -340,4 +340,55 @@ elif page == "Mining Locations":
         ).add_to(m)
 
     # Render map in Streamlit
-    st_data = st_folium(m, width=800, height=600)
+    st_data = st_folium(m, width=1200, height=600)
+
+    # --- Mining Locations Page ---
+elif page == "Mining Locations":
+    st.title("📍 Mining Locations in Kazakhstan")
+
+    # Load the CSV with mining data
+    df = pd.read_csv("mining_locations.csv")
+
+    # Create base map centered over Kazakhstan
+    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
+
+    # Helper function to parse and normalize tonnage
+    def extract_tonnage(value):
+        try:
+            if pd.isna(value) or "неизвестно" in str(value):
+                return 0
+            if "в год" in str(value):
+                value = value.split()[0]
+            value = str(value).split()[0].replace(',', '')
+            return float(value)
+        except:
+            return 0
+
+    # Iterate over DataFrame and add circles to the map
+    for _, row in df.iterrows():
+        lat = row['Широта']
+        lon = row['Долгота']
+        metals = row['Тип металла'].lower()
+        volume = extract_tonnage(row['Объем добычи/запасы (тонн)'])
+
+        # Set color and size
+        if "цинк" in metals and "медь" not in metals:
+            color = "#1f77b4"
+        elif "медь" in metals:
+            color = "#ffa500"
+        else:
+            color = "gray"
+
+        radius = max(3, min(10, (volume / 5_000_000) * 6))
+
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=radius,
+            popup=folium.Popup(f"{row['Название месторождения']}<br>{metals.title()}<br>{int(volume):,} т", max_width=250),
+            color=color,
+            fill=True,
+            fill_opacity=0.6
+        ).add_to(m)
+
+    # Render map in Streamlit
+    st_data = st_folium(m, width=1200, height=600)
