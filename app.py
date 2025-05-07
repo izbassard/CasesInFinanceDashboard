@@ -293,11 +293,15 @@ elif page == "Net Present Value":
     
 # --- Mining Locations Page ---
 elif page == "Mining Locations":
-    st.title("📍 Grouped Mining Locations in Kazakhstan")
+    st.title("📍 Mining Locations in Kazakhstan")
 
+    # Load the CSV with mining data
     df = pd.read_csv("mining_locations.csv")
 
-    # Convert tons to float
+    # Create base map centered over Kazakhstan
+    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
+
+    # Helper function to parse and normalize tonnage
     def extract_tonnage(value):
         try:
             if pd.isna(value) or "неизвестно" in str(value):
@@ -309,112 +313,31 @@ elif page == "Mining Locations":
         except:
             return 0
 
-    df["Тоннаж"] = df["Объем добычи/запасы (тонн)"].apply(extract_tonnage)
+    # Iterate over DataFrame and add circles to the map
+    for _, row in df.iterrows():
+        lat = row['Широта']
+        lon = row['Долгота']
+        metals = row['Тип металла'].lower()
+        volume = extract_tonnage(row['Объем добычи/запасы (тонн)'])
 
-    # Haversine distance for clustering
-    def haversine(lat1, lon1, lat2, lon2):
-        R = 6371
-        dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
-        a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
-        return R * 2 * atan2(sqrt(a), sqrt(1 - a))
-
-    # Group nearby points within 30 km
-    grouped = []
-    used = set()
-    for i, row1 in df.iterrows():
-        if i in used:
-            continue
-        group = [i]
-        for j, row2 in df.iterrows():
-            if i != j and j not in used:
-                dist = haversine(row1['Широта'], row1['Долгота'], row2['Широта'], row2['Долгота'])
-                if dist < 30:
-                    group.append(j)
-        used.update(group)
-        grouped.append(df.loc[group])
-
-    # Create the folium map
-    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
-
-    # Define colors
-    COLOR_COPPER = "#ffa500"
-    COLOR_ZINC = "#1f77b4"
-
-    # Add legend
-    legend_html = """
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 150px; height: 80px; 
-                border:2px solid grey; z-index:9999; font-size:14px;
-                background-color:white;
-                padding: 10px;
-                border-radius: 5px;">
-        <div style="display: flex; align-items: center;">
-            <div style="background: {color_copper}; width: 20px; height: 20px; margin-right: 10px;"></div>
-            <span>Copper</span>
-        </div>
-        <div style="display: flex; align-items: center; margin-top: 5px;">
-            <div style="background: {color_zinc}; width: 20px; height: 20px; margin-right: 10px;"></div>
-            <span>Zinc</span>
-        </div>
-    </div>
-    """.format(color_copper=COLOR_COPPER, color_zinc=COLOR_ZINC)
-    m.get_root().html.add_child(folium.Element(legend_html))
-
-    for group in grouped:
-        lat = group["Широта"].mean()
-        lon = group["Долгота"].mean()
-        total_volume = group["Тоннаж"].sum()
-
-        contains_copper = group["Тип металла"].str.lower().str.contains("медь").any()
-        contains_zinc = group["Тип металла"].str.lower().str.contains("цинк").any()
-
-        # Determine volume per metal
-        copper_vol = group[group["Тип металла"].str.lower().str.contains("медь")]["Тоннаж"].sum()
-        zinc_vol = group[group["Тип металла"].str.lower().str.contains("цинк")]["Тоннаж"].sum()
-
-        # Normalize radius
-        radius = min(15, max(4, (total_volume / 1_000_000) * 5))
-
-        # Create popup content
-        popup_content = "<div style='max-width:300px;'><h4>Grouped Mines</h4>"
-        for _, r in group.iterrows():
-            popup_content += f"<p><b>{r['Название месторождения']}</b><br>"
-            popup_content += f"Metal: {r['Тип металла']}<br>"
-            popup_content += f"Volume: {int(r['Тоннаж']):,} tons</p>"
-        popup_content += "</div>"
-        
-        popup = folium.Popup(popup_content, max_width=300)
-
-        if contains_copper and contains_zinc:
-            # Create pie chart image
-            fig, ax = plt.subplots(figsize=(0.6, 0.6), dpi=100)
-            ax.pie([copper_vol, zinc_vol],
-                   colors=[COLOR_COPPER, COLOR_ZINC],
-                   wedgeprops=dict(width=0.5))
-            plt.axis('off')
-            buf = BytesIO()
-            plt.savefig(buf, format='png', transparent=True, bbox_inches='tight', pad_inches=0)
-            encoded = base64.b64encode(buf.getvalue()).decode()
-            html = f'<img src="data:image/png;base64,{encoded}" width="{radius * 5}px">'
-            icon = folium.DivIcon(html=html)
-            
-            # Add marker with popup
-            folium.Marker(
-                location=[lat, lon], 
-                icon=icon,
-                popup=popup
-            ).add_to(m)
-            plt.close()
+        # Set color and size
+        if "цинк" in metals and "медь" not in metals:
+            color = "#1f77b4"
+        elif "медь" in metals:
+            color = "#ffa500"
         else:
-            color = COLOR_COPPER if contains_copper else COLOR_ZINC
-            folium.CircleMarker(
-                location=[lat, lon],
-                radius=radius,
-                popup=popup,
-                color=color,
-                fill=True,
-                fill_opacity=0.6
-            ).add_to(m)
+            color = "gray"
 
-    st_folium(m, width=800, height=600)
+        radius = max(3, min(10, (volume / 5_000_000) * 6))
+
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=radius,
+            popup=folium.Popup(f"{row['Название месторождения']}<br>{metals.title()}<br>{int(volume):,} т", max_width=250),
+            color=color,
+            fill=True,
+            fill_opacity=0.6
+        ).add_to(m)
+
+    # Render map in Streamlit
+    st_data = st_folium(m, width=800, height=600)
