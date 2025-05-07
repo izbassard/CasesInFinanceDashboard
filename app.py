@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import folium
+from streamlit_folium import st_folium
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Kazakhmys Dashboard", layout="wide")
@@ -40,12 +42,6 @@ page = st.sidebar.radio(
     ["Market Research", "Net Present Value"],
     label_visibility="collapsed"
 )
-
-# Update URL based on selection (simulated since Streamlit doesn't support direct URL manipulation)
-if page == "Market Research":
-    st.sidebar.markdown("**Current Page:** `/market-research`")
-elif page == "Net Present Value":
-    st.sidebar.markdown("**Current Page:** `/npv-analysis`")
 
 # --- Load Data ---
 # Load copper & zinc prices
@@ -271,7 +267,7 @@ elif page == "Net Present Value":
             y=1.02,
             xanchor="right",
             x=1
-        )
+        )   
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -288,3 +284,55 @@ elif page == "Net Present Value":
     </small>
     </div>
     """.format(crossover_rate if crossover_rate is not None else "not in range"), unsafe_allow_html=True)
+
+    
+# --- Mining Locations Page ---
+elif page == "Mining Locations":
+    st.title("📍 Mining Locations in Kazakhstan")
+
+    # Load the CSV with mining data
+    df = pd.read_csv("mining_locations.csv")
+
+    # Create base map centered over Kazakhstan
+    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
+
+    # Helper function to parse and normalize tonnage
+    def extract_tonnage(value):
+        try:
+            if pd.isna(value) or "неизвестно" in str(value):
+                return 0
+            if "в год" in str(value):
+                value = value.split()[0]
+            value = str(value).split()[0].replace(',', '')
+            return float(value)
+        except:
+            return 0
+
+    # Iterate over DataFrame and add circles to the map
+    for _, row in df.iterrows():
+        lat = row['Широта']
+        lon = row['Долгота']
+        metals = row['Тип металла'].lower()
+        volume = extract_tonnage(row['Объем добычи/запасы (тонн)'])
+
+        # Set color and size
+        if "цинк" in metals and "медь" not in metals:
+            color = "#1f77b4"
+        elif "медь" in metals:
+            color = "#ffa500"
+        else:
+            color = "gray"
+
+        radius = max(3, (volume / 1_000_000) * 5)  # Normalize radius
+
+        folium.CircleMarker(
+            location=[lat, lon],
+            radius=radius,
+            popup=folium.Popup(f"{row['Название месторождения']}<br>{metals.title()}<br>{int(volume):,} т", max_width=250),
+            color=color,
+            fill=True,
+            fill_opacity=0.6
+        ).add_to(m)
+
+    # Render map in Streamlit
+    st_data = st_folium(m, width=800, height=600)
