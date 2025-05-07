@@ -4,8 +4,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 import folium
-from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+import numpy as np
+from math import radians, cos, sin, sqrt, atan2
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Kazakhmys Dashboard", layout="wide")
@@ -289,15 +293,11 @@ elif page == "Net Present Value":
     
 # --- Mining Locations Page ---
 elif page == "Mining Locations":
-    st.title("📍 Mining Locations in Kazakhstan")
+    st.title("📍 Grouped Mining Locations in Kazakhstan")
 
-    # Load the CSV with mining data
     df = pd.read_csv("mining_locations.csv")
 
-    # Create base map centered over Kazakhstan
-    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
-
-    # Helper function to extract tonnage
+    # Convert tons to float
     def extract_tonnage(value):
         try:
             if pd.isna(value) or "неизвестно" in str(value):
@@ -309,45 +309,78 @@ elif page == "Mining Locations":
         except:
             return 0
 
-    # Create a marker cluster
-    cluster = MarkerCluster().add_to(m)
+    df["Тоннаж"] = df["Объем добычи/запасы (тонн)"].apply(extract_tonnage)
 
-    # Add markers
-    for _, row in df.iterrows():
-        lat = row['Широта']
-        lon = row['Долгота']
-        metals = row['Тип металла'].lower()
-        volume = extract_tonnage(row['Объем добычи/запасы (тонн)'])
+    # Haversine distance for clustering
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371
+        dlat = radians(lat2 - lat1)
+        dlon = radians(lon2 - lon1)
+        a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
+        return R * 2 * atan2(sqrt(a), sqrt(1 - a))
 
-        # Determine color
-        if "цинк" in metals and "медь" not in metals:
-            color = "#1f77b4"
-        elif "медь" in metals:
-            color = "#ffa500"
+    # Group nearby points within 30 km
+    grouped = []
+    used = set()
+    for i, row1 in df.iterrows():
+        if i in used:
+            continue
+        group = [i]
+        for j, row2 in df.iterrows():
+            if i != j and j not in used:
+                dist = haversine(row1['Широта'], row1['Долгота'], row2['Широта'], row2['Долгота'])
+                if dist < 30:
+                    group.append(j)
+        used.update(group)
+        grouped.append(df.loc[group])
+
+    # Create the folium map
+    m = folium.Map(location=[48.0, 67.0], zoom_start=5)
+
+    # Define colors
+    COLOR_COPPER = "#ffa500"
+    COLOR_ZINC = "#1f77b4"
+
+    for group in grouped:
+        lat = group["Широта"].mean()
+        lon = group["Долгота"].mean()
+        total_volume = group["Тоннаж"].sum()
+
+        metals = group["Тип металла"].str.lower().str.contains("медь|цинк")
+        contains_copper = group["Тип металла"].str.lower().str.contains("медь").any()
+        contains_zinc = group["Тип металла"].str.lower().str.contains("цинк").any()
+
+        # Determine volume per metal
+        copper_vol = group[group["Тип металла"].str.lower().str.contains("медь")]["Тоннаж"].sum()
+        zinc_vol = group[group["Тип металла"].str.lower().str.contains("цинк")]["Тоннаж"].sum()
+
+        # Normalize radius
+        radius = min(15, max(4, (total_volume / 1_000_000) * 5))
+
+        if contains_copper and contains_zinc:
+            # Create pie chart image
+            fig, ax = plt.subplots(figsize=(0.6, 0.6), dpi=100)
+            ax.pie([copper_vol, zinc_vol],
+                   colors=[COLOR_COPPER, COLOR_ZINC],
+                   wedgeprops=dict(width=0.5))
+            plt.axis('off')
+            buf = BytesIO()
+            plt.savefig(buf, format='png', transparent=True, bbox_inches='tight', pad_inches=0)
+            encoded = base64.b64encode(buf.getvalue()).decode()
+            html = f'<img src="data:image/png;base64,{encoded}" width="{radius * 5}px">'
+            icon = folium.DivIcon(html=html)
+            folium.Marker(location=[lat, lon], icon=icon).add_to(m)
+            plt.close()
         else:
-            color = "gray"
+            color = COLOR_COPPER if contains_copper else COLOR_ZINC
+            popup = "<br>".join([f"<b>{r['Название месторождения']}</b>: {int(r['Тоннаж']):,} т" for _, r in group.iterrows()])
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=radius,
+                popup=folium.Popup(popup, max_width=300),
+                color=color,
+                fill=True,
+                fill_opacity=0.6
+            ).add_to(m)
 
-        # Calculate radius with upper/lower bounds
-        min_radius = 3
-        max_radius = 15
-        radius = min(max(min_radius, (volume / 1_000_000) * 5), max_radius)
-
-        # Create popup content
-        popup_html = f"""
-        <b>{row['Название месторождения']}</b><br>
-        <b>Металлы:</b> {metals.title()}<br>
-        <b>Объем:</b> {volume:,.0f} т
-        """
-
-        # Add circle marker to cluster
-        folium.CircleMarker(
-            location=[lat, lon],
-            radius=radius,
-            popup=folium.Popup(popup_html, max_width=300),
-            color=color,
-            fill=True,
-            fill_opacity=0.6
-        ).add_to(cluster)
-
-    # Display the map
-    st_data = st_folium(m, width=800, height=600)
+    st_folium(m, width=800, height=600)
