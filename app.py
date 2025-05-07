@@ -341,12 +341,31 @@ elif page == "Mining Locations":
     COLOR_COPPER = "#ffa500"
     COLOR_ZINC = "#1f77b4"
 
+    # Add legend
+    legend_html = """
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 150px; height: 80px; 
+                border:2px solid grey; z-index:9999; font-size:14px;
+                background-color:white;
+                padding: 10px;
+                border-radius: 5px;">
+        <div style="display: flex; align-items: center;">
+            <div style="background: {color_copper}; width: 20px; height: 20px; margin-right: 10px;"></div>
+            <span>Copper</span>
+        </div>
+        <div style="display: flex; align-items: center; margin-top: 5px;">
+            <div style="background: {color_zinc}; width: 20px; height: 20px; margin-right: 10px;"></div>
+            <span>Zinc</span>
+        </div>
+    </div>
+    """.format(color_copper=COLOR_COPPER, color_zinc=COLOR_ZINC)
+    m.get_root().html.add_child(folium.Element(legend_html))
+
     for group in grouped:
         lat = group["Широта"].mean()
         lon = group["Долгота"].mean()
         total_volume = group["Тоннаж"].sum()
 
-        metals = group["Тип металла"].str.lower().str.contains("медь|цинк")
         contains_copper = group["Тип металла"].str.lower().str.contains("медь").any()
         contains_zinc = group["Тип металла"].str.lower().str.contains("цинк").any()
 
@@ -356,6 +375,16 @@ elif page == "Mining Locations":
 
         # Normalize radius
         radius = min(15, max(4, (total_volume / 1_000_000) * 5))
+
+        # Create popup content
+        popup_content = "<div style='max-width:300px;'><h4>Grouped Mines</h4>"
+        for _, r in group.iterrows():
+            popup_content += f"<p><b>{r['Название месторождения']}</b><br>"
+            popup_content += f"Metal: {r['Тип металла']}<br>"
+            popup_content += f"Volume: {int(r['Тоннаж']):,} tons</p>"
+        popup_content += "</div>"
+        
+        popup = folium.Popup(popup_content, max_width=300)
 
         if contains_copper and contains_zinc:
             # Create pie chart image
@@ -369,15 +398,20 @@ elif page == "Mining Locations":
             encoded = base64.b64encode(buf.getvalue()).decode()
             html = f'<img src="data:image/png;base64,{encoded}" width="{radius * 5}px">'
             icon = folium.DivIcon(html=html)
-            folium.Marker(location=[lat, lon], icon=icon).add_to(m)
+            
+            # Add marker with popup
+            folium.Marker(
+                location=[lat, lon], 
+                icon=icon,
+                popup=popup
+            ).add_to(m)
             plt.close()
         else:
             color = COLOR_COPPER if contains_copper else COLOR_ZINC
-            popup = "<br>".join([f"<b>{r['Название месторождения']}</b>: {int(r['Тоннаж']):,} т" for _, r in group.iterrows()])
             folium.CircleMarker(
                 location=[lat, lon],
                 radius=radius,
-                popup=folium.Popup(popup, max_width=300),
+                popup=popup,
                 color=color,
                 fill=True,
                 fill_opacity=0.6
