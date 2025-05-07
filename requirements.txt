@@ -5,5 +5,3 @@ streamlit
 folium
 streamlit-folium
 matplotlib
-io
-math
